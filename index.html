@@ -2,14 +2,67 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 	<script src="stuff/bUtils.js"></script>
-	<link rel="stylesheet" type="text/css" href="stuff/btStyle.css">
+	<title>PTAIFV</title>
 	<script>
+		/** @type {CanvasUtil} */
+		var ctx = null
+		
+
 		function setup() {
+			ctx = E.mainCanvas.toCtx()
+		}
+
+		function update() {
+			var size = E.mainCanvasHost.getSize()
+			ctx.canvas.canvas.setSize(size)
+			ctx.setSize(size)
+			ctx.clear()
+			
 
 		}
 	</script>
 </head>
-<body>
+<body style="margin: 0; height: 100vh; width: 100vw; font-family: Verdana; font-size: 15px">
+	<div style="display: flex; flex-direction: column; height: 100%; box-sizing: border-box">
+		<header style="flex: 0 0; border-bottom: 1px solid black; padding: 4px">
+			<!-- Header -->
+			<b>PTAIFV</b> | <button>Test</button>
+		</header>
+		<main style="flex: 1 1">
+			<!-- Center area -->
+			<div style="display: flex; flex-direction: row; height: 100%; box-sizing: border-box">
+				<!-- Canvas -->
+				<canvas id="mainCanvas" style="position: absolute"></canvas>
+				<div id="mainCanvasHost" style="flex: 1 1; background-color: black"></div>
+				<div style="flex: 0 1 500px; border-left: 1px solid black; overflow: auto; display:flex; flex-direction: column">
+					<div style="flex: 1 1; border-bottom: 1px black solid">
+						<div style="display:flex">
+							<button style="flex: 1 1; border: none; border-bottom: 1px solid black" id="objectsButton">Objects</button>
+							<button style="flex: 1 1; border: none; border-left: 1px solid black; border-bottom: 1px solid black" id="anchorsButton">Anchors</button>
+						</div>
+						<div style="overflow: auto;">
+							<!-- Object selection panel -->
+							N prob
+						</div>
+					</div>
+					<div style="flex: 1 1">
+						<!-- Selected object property panel -->
+						props
+					</div>
+				</div>
+			</div>
+		</main>
+		<footer style="flex: 0 1; border-top: 1px solid black;">
+			<!-- Footer -->
+			<div style="">
+				<input type="range" min="0" max="1" style="width:calc(100% - 10px)" id="timeLineScrub" />
+				<div style="margin: 4px; border: gray 1px solid; height: 200px; overflow: auto" id="timeline">
+					<!-- Timeline -->
+				</div>
 
+			</div>
+
+		</footer>
+	</div>
 </body>
 </html>

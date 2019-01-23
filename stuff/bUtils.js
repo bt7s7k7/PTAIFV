@@ -2830,7 +2830,7 @@ geometry = {
 if (B.isHTML) {
 	B.module.init("canvas", 1.1, [], () => { })
 
-	window.CanvasUtil = class CanvasUtil {
+	class CanvasUtil {
 		/**
 		 * @param {CanvasRenderingContext2D} canvas
 		 */
