@@ -6,19 +6,269 @@
 	<script>
 		/** @type {CanvasUtil} */
 		var ctx = null
-		
+		/**
+		 * @typedef {{type: string, data: Object<string, any>}} Anchor
+		 * @typedef {{type: string, pos: string, data: Object<string, any>}} Visual
+		 * @typedef {{time: number, value: any}} Timekey
+		 * @typedef {{ref: string, path: string, keys: Array<Timekey>}} Timeline
+		 * @typedef {{anchors: Object<string,Anchor>, visuals: Object<string,Visual>, timeline: Array<Timeline>, size: number[], name: string}} Project
+		 * @type {Project}
+		 * */
+		var project = null
+
+		function newProject() {
+			B.createForm(null, [
+				{
+					name: "Name",
+					type: "text",
+					value: "New Project",
+					id: "name"
+				}, {
+					name: "Width (px)",
+					type: "number",
+					value: 1920,
+					id: "width"
+				}, {
+					name: "Height (px)",
+					type: "number",
+					value: 1080,
+					id: "height"
+				}
+			], "Create").then((res) => {
+				project = {
+					anchors: {},
+					visuals: {},
+					timeline: [],
+					size: [res.width, res.height],
+					name: res.name
+				}
+
+				B.l.project = project
+				reflow()
+			})
+
+
+		}
+
+		/**
+		 * @param {string} name
+		 * @returns {number[]}
+		 */
+		function getPos(name) {
+
+		}
+
+		/** @type {Object<string, {make: ()=>Visual, render: (me: Visual, size : number[], pixelScale : number)=>void}>} */
+		var visualTypes = {
+			Rect: {
+				make: () => ({ type: "Rect", data: { "#pos": "[10,10", "#size": "[10,10", color: colors.white, lineWidth: 1, fill: false } }),
+				render(me, size, pixelScale) {
+					var pos = getPos(me.data["#pos"])
+					var meSize = getPos(me.data["#size"])
+					ctx.setColor(me.data.color)[me.data.fill ? "box" : "rect"](pos, meSize, me.data.lineWidth * pixelScale)
+				}
+			}
+		}
+		/** @type {Object<string, {make: ()=>Anchor, getPos: (me: Anchor)=>number[]}>} */
+		var anchorTypes = {
+			Position: {
+				make: () => ({ type: "Position", data: { x: 0, y: 0, useFraction: false } }),
+				getPos: (me) => [me.data.x, me.data.y].scale(me.data.useFraction ? project.size : [1, 1])
+			}
+		}
 
 		function setup() {
 			ctx = E.mainCanvas.toCtx()
+			if (B.l.project) {
+				project = B.l.project
+				reflow()
+			} else {
+				newProject()
+			}
+
 		}
 
 		function update() {
-			var size = E.mainCanvasHost.getSize()
-			ctx.canvas.canvas.setSize(size)
-			ctx.setSize(size)
+			var fullSize = E.mainCanvasHost.getSize()
+			ctx.canvas.canvas.setSize(fullSize)
+			ctx.setSize(fullSize)
 			ctx.clear()
-			
 
+			if (!project) {
+				ctx.setColor(colors.white).text(fullSize.mul(0.5), 50, "No project loaded".split("").map(v=>(Math.random() < 0.01 ? "#&@?".split("").random() : v)).join(""), true)
+			} else {
+				var aspectRatio = (project.size[0] / project.size[1]) / (fullSize[0] / fullSize[1])
+				var size = [0, 0]
+				if (aspectRatio < 1) {
+					size = [fullSize[0] * aspectRatio, fullSize[1]]
+				} else {
+					size = [fullSize[0], fullSize[1] / aspectRatio]
+				}
+				var gradient = ctx.canvas.createLinearGradient(0, 0, size[0], 0)
+				gradient.addColorStop(0, colors.voidGrey.mul(0.5).toHex());
+				gradient.addColorStop(1, colors.notepad.toHex());
+				ctx.setColor(gradient).box([0, 0], size)
+				var sizeMul = project.size[0] / fullSize[0]
+
+
+			}
+		}
+
+		function reflow() {
+			reflowDesc()
+			reflowLists()
+		}
+
+		function reflowDesc() {
+			E.projectName.innerText = project ? project.name : "nothing"
+		}
+
+		/**
+		 * @param {HTMLElement} parent
+		 * @param {string} name
+		 * @param {boolean} isAnchor
+		 */
+		function appendObjectProps(parent, name, isAnchor, isLinked = false) {
+			if (project) {
+				var targetElement = isAnchor ? project.anchors[name] : project.visuals[name]
+				var header = document.createElement("div")
+
+				header.style.padding = "4px"
+				if (isLinked) header.style.borderTop = "4px solid #00ff00"
+
+				if (targetElement) {
+
+					var containDiv = document.createElement("div")
+					containDiv.style.borderBottom = "1px solid black"
+
+					header.style.backgroundColor = isAnchor ? "lightblue" : "lightgray"
+					containDiv.appendChild(header)
+					parent.appendChild(containDiv)
+
+					var nameInp = document.createElement("input")
+					nameInp.value = name
+					nameInp.readOnly = isLinked
+					nameInp.addEventListener("change", () => {
+						if (isLinked) return
+						delete (isAnchor ? project.anchors : project.visuals)[name];
+						(isAnchor ? project.anchors : project.visuals)[nameInp.value] = targetElement
+						selectedObject = nameInp.value
+						reflowLists()
+					})
+					header.appendChild(nameInp)
+
+					var propDiv = document.createElement("div")
+					containDiv.appendChild(propDiv)
+					propDiv.style.padding = "4px"
+
+					var delButton = document.createElement("button")
+					delButton.appendChild(document.createTextNode("-"))
+					delButton.addEventListener("click", () => {
+						delete (isAnchor ? project.anchors : project.visuals)[name]
+						if (!isLinked) selectedObject = null
+						reflowLists()
+					})
+					header.appendChild(delButton)
+
+					B.formify(propDiv, targetElement.data, "Save", false, () => reflowLists(), true)
+
+					var done = []
+					targetElement.data.toArray().forEach(v => {
+						if (v.key[0] == "#" && v.value[0] != "[" && done.indexOf(v.value) == -1) {
+							appendObjectProps(parent, v.value, true, true)
+							done.push(v.value)
+						}
+					})
+				} else {
+					header.appendChild(document.createTextNode(name))
+
+					var createButton = document.createElement("button")
+					createButton.appendChild(document.createTextNode("+"))
+					createButton.addEventListener("click", () => {
+						newObject(name, true)
+					})
+					header.appendChild(createButton)
+
+					parent.appendChild(header)
+					header.style.backgroundColor = "lightcoral"
+					parent.append(header)
+					
+				}
+			} else {
+				var error = document.createElement("div")
+				error.style.backgroundColor = "lightcoral"
+				error.appendChild(document.createTextNode("No project open"))
+				parent.appendChild(parent)
+			}
+
+
+		}
+
+		var isAnchorSelection = false
+		var isAnchorSelected = false
+		var selectedObject = null
+		function reflowLists() {
+			B.removeChildrenOf(E.selectionList)
+			B.removeChildrenOf(E.propertyList)
+
+			E.objectsButton.style.backgroundColor = isAnchorSelection ? "lightgray" : "lightgreen"
+			E.anchorsButton.style.backgroundColor = !isAnchorSelection ? "lightgray" : "lightgreen"
+
+			E.objectsButton.blur()
+			E.anchorsButton.blur()
+
+			if (project) {
+				(isAnchorSelection ? project.anchors : project.visuals).toArray().forEach((v) => {
+					var button = document.createElement("button")
+					var wasSelection = isAnchorSelection
+					button.style.border = "none"
+					button.onclick = () => {
+						isAnchorSelected = wasSelection
+						selectedObject = v.key
+						reflowLists()
+					}
+					button.appendChild(document.createTextNode(v.key))
+					button.style.width = "100%"
+					button.style.textAlign = "left"
+					button.style.backgroundColor = (wasSelection == isAnchorSelection && v.key == selectedObject) ? "lightgreen" : "lightgrey"
+					E.selectionList.appendChild(button)
+				})
+			}
+
+			if (project && selectedObject) {
+				appendObjectProps(E.propertyList, selectedObject, isAnchorSelected)
+			}
+		}
+
+		function download() {
+			var json = JSON.stringify(project)
+			B.saveFile(json, project.name + ".json", "application/json")
+		}
+
+		function upload() {
+			B.loadFile("application/json", false).then(([file]) => {
+				var reader = new FileReader();
+				reader.onload = () => {
+					var projectF = JSON.parse(reader.result)
+					project = projectF
+					reflow()
+
+				}
+				reader.readAsText(file)
+
+
+			})
+		}
+
+		function newObject(name = "New Object", isAnchor = isAnchorSelection) {
+			var source = (isAnchor ? anchorTypes : visualTypes)
+			B.createForm(null, [
+				{ name: "Name", type: "text", value: name, id: "name" },
+				{ name: "Type", type: "selection", options: source.toArray().map(v => v.key), id: "type"}
+			], "Create", true).then((ret) => {
+				project[(isAnchor ? "anchors" : "visuals")][ret.name] = source[ret.type].make()
+				reflowLists()
+			})
 		}
 	</script>
 </head>
@@ -26,7 +276,11 @@
 	<div style="display: flex; flex-direction: column; height: 100%; box-sizing: border-box">
 		<header style="flex: 0 0; border-bottom: 1px solid black; padding: 4px">
 			<!-- Header -->
-			<b>PTAIFV</b> | <button>Test</button>
+			<b>PTAIFV</b> - <span id="projectName"></span> |
+			<button onclick="newProject()">New</button>
+			<button onclick="project = null; reflow()">Close</button>
+			<button onclick="download()">Download</button>
+			<button onclick="upload()">Upload</button>
 		</header>
 		<main style="flex: 1 1">
 			<!-- Center area -->
@@ -35,20 +289,15 @@
 				<canvas id="mainCanvas" style="position: absolute"></canvas>
 				<div id="mainCanvasHost" style="flex: 1 1; background-color: black"></div>
 				<div style="flex: 0 1 500px; border-left: 1px solid black; overflow: auto; display:flex; flex-direction: column">
-					<div style="flex: 1 1; border-bottom: 1px black solid">
-						<div style="display:flex">
-							<button style="flex: 1 1; border: none; border-bottom: 1px solid black" id="objectsButton">Objects</button>
-							<button style="flex: 1 1; border: none; border-left: 1px solid black; border-bottom: 1px solid black" id="anchorsButton">Anchors</button>
+					<div style="flex: 1 1; border-bottom: 1px black solid; display: flex; flex-direction: column">
+						<div style="display:flex; flex: 0 0 20px">
+							<button style="flex: 1 1; border: none; border-bottom: 1px solid black" id="objectsButton" onclick="isAnchorSelection = false; reflowLists();">Visuals</button>
+							<button style="flex: 1 1; border: none; border-left: 1px solid black; border-bottom: 1px solid black" id="anchorsButton" onclick="isAnchorSelection = true; reflowLists();">Anchors</button>
+							<button style="flex: 0 1; border: none; border-left: 1px solid black; border-bottom: 1px solid black" onclick="newObject()">+</button>
 						</div>
-						<div style="overflow: auto;">
-							<!-- Object selection panel -->
-							N prob
-						</div>
+						<div style="overflow: auto; flex: 1 1" id="selectionList"></div>
 					</div>
-					<div style="flex: 1 1">
-						<!-- Selected object property panel -->
-						props
-					</div>
+					<div style="flex: 1 1; overflow: auto" id="propertyList"></div>
 				</div>
 			</div>
 		</main>

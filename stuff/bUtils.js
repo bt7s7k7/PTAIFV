@@ -702,7 +702,11 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 		}
 	}
 
-	B.saveFile = function (src, name = "") {
+	B.saveFile = function (src, name = "", type = null) {
+		if (type) {
+			var newSrc = "data:" + type + "," + encodeURIComponent(src);
+			src = newSrc
+		}
 		var a = document.createElement("a")
 		a.download = name
 		a.href = src
@@ -857,7 +861,7 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 						option.innerText = v
 						select.appendChild(option)
 					})
-					select.value = v.value
+					select.value = v.value || v.options[0]
 					span.appendChild(select)
 				},
 				"none", () => { },
@@ -1060,6 +1064,15 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 			req.send()
 		})
 
+	}
+
+	/**
+	 * @param {HTMLElement} element
+	 */
+	B.removeChildrenOf = function (element) {
+		while (element.childElementCount > 0) {
+			element.removeChild(element.childNodes[0])
+		} 
 	}
 
 } else {
@@ -1978,7 +1991,7 @@ Array.prototype.containsVector = function (vector) {
 Array.prototype.toHex = function () {
 	var ret = "#"
 	this.forEach((v) => {
-		ret += v.toString(16).fillZeroPrefix(2)
+		ret += v.floor().toString(16).fillZeroPrefix(2)
 	})
 	return ret
 }
