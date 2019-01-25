@@ -137,6 +137,11 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 				return [rect.width, rect.height]
 			}
 
+			Element.prototype.getPos = function () {
+				var rect = this.getBoundingClientRect()
+				return [rect.left, rect.top]
+			}
+
 			Element.prototype.setSize = function (size) {
 				this.style.width = size[0] + "px"
 				this.style.height = size[1] + "px"
@@ -745,7 +750,7 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 		})
 	}
 
-	B.createForm = function (element, fields, submitText = "OK", enterToSubmit = false) {
+	B.createForm = function (element, fields, submitText = "OK", enterToSubmit = false, changeToSubmit = false) {
 		/* @@@createForm
 			[
 				name: "Address",
@@ -887,6 +892,7 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 		})
 
 		var button = document.createElement("button")
+		if (submitText.length == 0) button.hidden = true
 		button.innerText = submitText
 		element.appendChild(button)
 
@@ -904,6 +910,7 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 			}
 			element.appendChild(cancelButton)
 		}
+
 		if (enterToSubmit) {
 			let listener = (event) => {
 				if (event.key == "Enter") {
@@ -916,9 +923,16 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 
 		}
 		var ret = {}
-		var changeFunc = () => { }
+		var changeFunc = (ret) => {
+			changeCallback()
+			if (changeToSubmit) {
+				button.click()
+			}
+		}
+		var changeCallback = (ret) => { }
 		ret.change = function (func) {
-			changeFunc = func
+			changeCallback = func
+			
 			return this
 		}
 		ret.then = function (func) {
@@ -928,7 +942,7 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 		return ret
 	}
 
-	B.formify = function (element, object, buttonText = "OK", repeat = false, callback = (object) => { }, enterToSubmit = false) {
+	B.formify = function (element, object, buttonText = "OK", repeat = false, callback = (object) => { }, enterToSubmit = false, changeToSubmit = false) {
 		var formFields = []
 		object.forEach((v, i) => {
 			var i = i.toString()
@@ -981,13 +995,13 @@ if (typeof require == "undefined" && typeof self != "undefined" && typeof proces
 			)
 		})
 
-		B.createForm(element, formFields, buttonText, enterToSubmit).then((data) => {
+		B.createForm(element, formFields, buttonText, enterToSubmit, changeToSubmit).then((data) => {
 			data.forEach((v, i) => {
 				object[i] = v
 			})
 			callback(data)
 			if (repeat) B.formify(element, object, buttonText, repeat, callback)
-		})
+		},)
 	}
 	B.modalWindow = null
 	B.createModalWindow = function (bgColor = "white") {
@@ -2523,7 +2537,7 @@ if (!B.isNode) {
 	}
 
 	MouseEvent.prototype.getPos = function () {
-		var rect = this.target.getBoundingClientRect()
+		var rect = this.currentTarget.getBoundingClientRect()
 		return [
 			this.screenX - rect.left,
 			this.screenY - rect.top - 100

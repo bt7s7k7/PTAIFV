@@ -5,6 +5,7 @@ VisualStudioVersion = 15.0.28307.168
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8336002F-AEDF-4B81-9120-EC7DBB50AB5A}"
 	ProjectSection(SolutionItems) = preProject
+		code.js = code.js
 		index.html = index.html
 	EndProjectSection
 EndProject
