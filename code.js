@@ -228,6 +228,7 @@ function appendObjectProps(parent, name, isAnchor, isLinked = false) {
 				delete (isAnchor ? project.anchors : project.visuals)[name]
 				if (!isLinked) selectedObject = null
 				reflowLists()
+				reflowTimeline()
 			})
 			header.appendChild(delButton)
 
@@ -340,6 +341,15 @@ function reflowTimeline() {
 				reflowTimeline()
 			}
 		})
+		div.addEventListener("mousedown", (event) => {
+			if (event.button == 1) {
+				B.formify(null, { value: target.data[v.prop], interpolate: true, time: ((time + event.getPos()[0] / 100) * 10).floor() / 10 }, "Create", false, (ret) => {
+					v.keys.push(ret)
+					reflowTimeline()
+				}, true)
+			}
+		})
+
 		div.addEventListener("contextmenu", (event)=>event.preventDefault())
 
 		var end = document.createElement("div")
