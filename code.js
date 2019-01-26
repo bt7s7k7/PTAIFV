@@ -11,6 +11,7 @@ var ctx = null
 var project = null
 var playing = false
 
+
 function newProject() {
 	B.createForm(null, [
 		{
@@ -83,6 +84,10 @@ var anchorTypes = {
 	RotateAround: {
 		make: () => ({ type: "RotateAround", data: { "#center": "", angle: 0, offset: 20 } }),
 		getPos: (me) => getPos(me.data["#center"]).add(vector.fromAngle(me.data.angle / 180 * Math.PI).mul(me.data.offset))
+	},
+	Offset: {
+		make: () => ({ type: "Offset", data: { "#origin": "", x: 0, y: 0 } }),
+		getPos: (me) => getPos(me.data["#origin"]).add([me.data.x, me.data.y])
 	}
 }
 
@@ -94,7 +99,7 @@ function setup() {
 	} else {
 		newProject()
 	}
-	window.addEventListener("resize", ()=>reflow())
+	window.addEventListener("resize", () => reflow())
 }
 
 function applyAnimations() {
@@ -118,6 +123,7 @@ function applyAnimations() {
 		if (time > use.time && keys.length > useI + 1 && keys[useI + 1].interpolate) {
 			var second = keys[useI + 1]
 			var frac = (time - use.time) / (second.time - use.time)
+			frac = (Math.sin((frac - 0.5) * Math.PI) + 1) / 2
 			if (typeof second.value == "number") {
 				value = use.value.lerp(second.value, frac)
 			}
@@ -127,16 +133,16 @@ function applyAnimations() {
 }
 
 var lastPlayTime = Date.now()
-function update() {
-	var fullSize = E.mainCanvasHost.getSize()
-	ctx.canvas.canvas.setSize(fullSize)
+function update(start = Date.now()) {
+	var fullSize = recordMode && project ? project.size : E.mainCanvasHost.getSize()
+	ctx.canvas.canvas.setSize(E.mainCanvasHost.getSize())
 	ctx.setSize(fullSize)
 	ctx.clear()
 
 	if (!project) {
 		ctx.setColor(colors.white).text(fullSize.mul(0.5), 50, "No project loaded".split("").map(v => (Math.random() < 0.01 ? "#&@?".split("").random() : v)).join(""), true)
 	} else {
-		if (playing) {
+		if (playing || recordMode) {
 			let time = parseFloat(E.timeLineScrub.value) * project.length
 			time += (Date.now() - lastPlayTime) / 1000
 			lastPlayTime = Date.now()
@@ -151,10 +157,14 @@ function update() {
 		} else {
 			size = [fullSize[0], fullSize[1] / aspectRatio]
 		}
-		var gradient = ctx.canvas.createLinearGradient(0, 0, size[0], 0)
-		gradient.addColorStop(0, colors.voidGrey.mul(0.5).toHex());
-		gradient.addColorStop(1, colors.notepad.toHex());
-		ctx.setColor(gradient).box([0, 0], size)
+		if (!recordMode) {
+			var gradient = ctx.canvas.createLinearGradient(0, 0, size[0], 0)
+			gradient.addColorStop(0, colors.voidGrey.mul(0.5).toHex());
+			gradient.addColorStop(1, colors.notepad.toHex());
+			ctx.setColor(gradient).box([0, 0], size)
+		} else {
+			ctx.setColor(E.bgFillColor.value).fill()
+		}
 		var sizeMul = size[0] / project.size[0]
 
 		applyAnimations()
@@ -170,6 +180,15 @@ function update() {
 			}
 		})
 
+		if (recordMode) {
+			capture.getVideoTracks()[0].requestFrame()
+
+			if (Date.now() - captureStart >= project.length * 1000) {
+				recordMode = false
+				recorder.stop()
+				
+			}
+		}
 	}
 }
 
@@ -350,7 +369,7 @@ function reflowTimeline() {
 			}
 		})
 
-		div.addEventListener("contextmenu", (event)=>event.preventDefault())
+		div.addEventListener("contextmenu", (event) => event.preventDefault())
 
 		var end = document.createElement("div")
 		div.appendChild(end)
@@ -545,5 +564,43 @@ function newAnim() {
 			window.appendChild(document.createElement("button").setAttributes({ onclick: () => window.delete() }, "Cancel"))
 		}
 	}
+}
+var captureStart = 0
+/** @type {MediaStream} */
+var capture = null
+var recordMode = false
+var recorder = null
+var blobData = []
+function record() {
+	
+	capture = ctx.canvas.canvas.captureStream()
+	captureStart = Date.now()
+	recordMode = true
+	recorder = new MediaRecorder(capture, { mimeType: "video/webm" })
+	blobData = []
+	recorder.ondataavailable = (e) => {
+		blobData.push(e.data)
+	}
+	recorder.start()
+	E.timeLineScrub.value = 0
+	lastPlayTime = Date.now()
 
+	recorder.onstop = () => {
+		var fullBlob = new Blob(blobData, { type: "video/webm" })
+		var url = URL.createObjectURL(fullBlob)
+		var window = B.createModalWindow()
+		var player = document.createElement("video")
+		window.appendChild(player)
+		var close = document.createElement("button")
+		window.appendChild(close)
+		close.appendChild(document.createTextNode("Close"))
+		close.addEventListener("click", () => {
+			window.delete()
+			URL.revokeObjectURL(url)
+		})
+		player.controls = true
+		player.setSize([500 * project.size[0] / project.size[1],500])
+		player.src = url
+				//B.saveFile(URL.createObjectURL(fullBlob), project.name + ".webm", "video/webm")
+	}
 }

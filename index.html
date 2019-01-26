@@ -15,6 +15,8 @@
 			<button onclick="download()">Download</button>
 			<button onclick="upload()">Upload</button>
 			<button onclick="playing ^= 1; lastPlayTime = Date.now()">&#10074;&#10074;&#9654;</button>
+			<button onclick="record()">Record</button>
+			<input type="color" value="#ff00ff" id="bgFillColor" />
 			Length: <input type="number" id="projectLength" onchange="if (project) project.length = parseFloat(this.value); reflow()"/>
 		</header>
 		<main style="flex: 1 1">
