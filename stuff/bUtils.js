@@ -2926,7 +2926,7 @@ if (B.isHTML) {
 			this.canvas.fill()
 			return this
 		}
-		strokeEllipse(pos, size, width = 1, rot = [0, Math.PI * 2]) {
+		strokeEllipse(pos, size, rot = [0, Math.PI * 2], width = 1) {
 			pos = pos.add(this.globalOffset)
 			this.canvas.lineWidth = width;
 			this.canvas.beginPath()

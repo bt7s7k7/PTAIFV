@@ -4,6 +4,7 @@
 	<script src="stuff/bUtils.js"></script>
 	<title>PTAIFV</title>
 	<script src="./code.js"></script>
+	<script src="./types.js"></script>
 </head>
 <body style="margin: 0; height: 100vh; width: 100vw; font-family: Verdana; font-size: 15px">
 	<div style="display: flex; flex-direction: column; height: 100%; box-sizing: border-box">
@@ -16,7 +17,7 @@
 			<button onclick="upload()">Upload</button>
 			<button onclick="playing ^= 1; lastPlayTime = Date.now()">&#10074;&#10074;&#9654;</button>
 			<button onclick="record()">Record</button>
-			<input type="color" value="#ff00ff" id="bgFillColor" />
+			<input type="color" value="#000000" id="bgFillColor" />
 			Length: <input type="number" id="projectLength" onchange="if (project) project.length = parseFloat(this.value); reflow()"/>
 		</header>
 		<main style="flex: 1 1">
@@ -25,8 +26,8 @@
 				<!-- Canvas -->
 				<canvas id="mainCanvas" style="position: absolute"></canvas>
 				<div id="mainCanvasHost" style="flex: 1 1; background-color: black"></div>
-				<div style="flex: 0 1 500px; border-left: 1px solid black; overflow: auto; display:flex; flex-direction: column">
-					<div style="flex: 1 1; border-bottom: 1px black solid; display: flex; flex-direction: column">
+				<div style="flex: 0 1 500px; border-left: 1px solid black; overflow: auto; display:flex; flex-direction: column; position: relative">
+					<div style="border-bottom: 1px black solid; display: flex; flex-direction: column; height: 50%; position:absolute">
 						<div style="display:flex; flex: 0 0 20px">
 							<button style="flex: 1 1; border: none; border-bottom: 1px solid black" id="objectsButton" onclick="isAnchorSelection = false; reflowLists();">Visuals</button>
 							<button style="flex: 1 1; border: none; border-left: 1px solid black; border-bottom: 1px solid black" id="anchorsButton" onclick="isAnchorSelection = true; reflowLists();">Anchors</button>
@@ -34,7 +35,7 @@
 						</div>
 						<div style="overflow: auto; flex: 1 1" id="selectionList"></div>
 					</div>
-					<div style="flex: 1 1; overflow: auto" id="propertyList"></div>
+					<div style="overflow: auto; height: calc(50% - 1px); position:absolute; top: calc(50% + 1px); width: 100%" id="propertyList"></div>
 				</div>
 			</div>
 		</main>
@@ -46,7 +47,7 @@
 					<!-- Timeline -->
 					<div style="flex: 1 1; overflow: auto; display: flex; border-top: 1px solid black">
 						<div id="timelineNames" style="flex: 0 0 300px; width: 300px; border-left: 1px solid black"></div>
-						<div id="timeline" style="flex: 1 1; border-right: 1px solid black; border-left: 1px solid black; overflow: hidden; position: relative"></div>
+						<div id="timeline" style="flex: 1 1; border-right: 1px solid black; border-left: 1px solid black; position: relative"></div>
 					</div>
 					<button style="flex: 0 0 20px; border: 1px solid black" onclick="newAnim()">+</button>
 				</div>

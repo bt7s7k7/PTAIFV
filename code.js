@@ -55,41 +55,21 @@ function getPos(name) {
 		var percent = name[1] == "%"
 		return name.substr(percent ? 2 : 1).split(",").map(v => parseFloat(v)).scale(percent ? project.size : [1, 1])
 	} else {
-		var anchor = project.anchors[name]
+		var [aName, offset] = name.split("[")
+		var anchor = project.anchors[aName]
 		if (anchor && anchor.type in anchorTypes) {
-			return anchorTypes[anchor.type].getPos(anchor)
+			var calcPos = anchorTypes[anchor.type].getPos(anchor)
+			if (offset) calcPos.addI(getPos("[" + offset))
+			return calcPos
 		}
 	}
 	return [NaN, NaN]
 }
 
 /** @type {Object<string, {make: ()=>Visual, render: (me: Visual, size : number[], pixelScale : number)=>void}>} */
-var visualTypes = {
-	Rect: {
-		make: () => ({ type: "Rect", data: { "#pos": "[10,10", "#size": "[10,10", color: colors.white, lineWidth: 1, fill: false, pivotCenter: true } }),
-		render(me, size, pixelScale) {
-			var pos = getPos(me.data["#pos"])
-			var meSize = getPos(me.data["#size"])
-			if (me.data.pivotCenter) pos.addI(meSize.mul(-0.5))
-			ctx.setColor(me.data.color)[me.data.fill ? "box" : "rect"](pos.mul(pixelScale), meSize.mul(pixelScale), me.data.lineWidth * pixelScale)
-		}
-	}
-}
+var visualTypes = {}
 /** @type {Object<string, {make: ()=>Anchor, getPos: (me: Anchor)=>number[]}>} */
-var anchorTypes = {
-	Position: {
-		make: () => ({ type: "Position", data: { x: 0, y: 0, useFraction: false } }),
-		getPos: (me) => [me.data.x, me.data.y].scale(me.data.useFraction ? project.size : [1, 1])
-	},
-	RotateAround: {
-		make: () => ({ type: "RotateAround", data: { "#center": "", angle: 0, offset: 20 } }),
-		getPos: (me) => getPos(me.data["#center"]).add(vector.fromAngle(me.data.angle / 180 * Math.PI).mul(me.data.offset))
-	},
-	Offset: {
-		make: () => ({ type: "Offset", data: { "#origin": "", x: 0, y: 0 } }),
-		getPos: (me) => getPos(me.data["#origin"]).add([me.data.x, me.data.y])
-	}
-}
+var anchorTypes = {}
 
 function setup() {
 	ctx = E.mainCanvas.toCtx()
@@ -126,6 +106,13 @@ function applyAnimations() {
 			frac = (Math.sin((frac - 0.5) * Math.PI) + 1) / 2
 			if (typeof second.value == "number") {
 				value = use.value.lerp(second.value, frac)
+			} else if (typeof second.value == "string") {
+				let tLength = use.value.length.lerp(second.value.length, frac)
+				let fLength = second.value.length * frac
+				value = second.value.substr(0, fLength) + use.value.substr(fLength, tLength - fLength)
+				if (value[value.length - 1] == "\\") {
+					value = value.substr(0, value.length - 1)
+				}
 			}
 		}
 		targetObject.data[v.prop] = value
@@ -186,7 +173,7 @@ function update(start = Date.now()) {
 			if (Date.now() - captureStart >= project.length * 1000) {
 				recordMode = false
 				recorder.stop()
-				
+
 			}
 		}
 	}
@@ -207,8 +194,9 @@ function reflowDesc() {
  * @param {HTMLElement} parent
  * @param {string} name
  * @param {boolean} isAnchor
+ * @param {string[]} isLinked 
  */
-function appendObjectProps(parent, name, isAnchor, isLinked = false) {
+function appendObjectProps(parent, name, isAnchor, isLinked = null) {
 	if (project) {
 		var targetElement = isAnchor ? project.anchors[name] : project.visuals[name]
 		var header = document.createElement("div")
@@ -260,11 +248,11 @@ function appendObjectProps(parent, name, isAnchor, isLinked = false) {
 
 			B.formify(propDiv, targetElement.data, "", false, () => reflowLists(), true, true)
 
-			var done = []
+			var done = isLinked ? isLinked : []
 			targetElement.data.toArray().forEach(v => {
-				if (v.key[0] == "#" && v.value[0] != "[" && done.indexOf(v.value) == -1) {
-					appendObjectProps(parent, v.value, true, true)
-					done.push(v.value)
+				if (v.key[0] == "#" && v.value[0] != "[" && done.indexOf(v.value.split("[")[0]) == -1) {
+					appendObjectProps(parent, v.value.split("[")[0], true, done)
+					done.push(v.value.split("[")[0])
 				}
 			})
 		} else {
@@ -332,8 +320,10 @@ function reflowLists() {
 var selectedKey = null
 
 function reflowTimeline() {
+	var scroll = E.timeline.parentElement.scrollTop
 	B.removeChildrenOf(E.timeline)
 	B.removeChildrenOf(E.timelineNames)
+	if (recordMode) return
 	var time = parseFloat(E.timeLineScrub.value) * project.length
 	project.timeline.forEach((v, i) => {
 		var target = project[v.isAnchor ? "anchors" : "visuals"][v.name]
@@ -345,6 +335,7 @@ function reflowTimeline() {
 		div.style.borderBottom = "1px solid black"
 		div.style.height = "20px"
 		div.style.overflow = "hidden"
+		div.style.zIndex = "1"
 		div.addEventListener("mousemove", (event) => {
 			if (selectedKey && B.mouseDown[2]) {
 				if (selectedKey.line == i) {
@@ -379,16 +370,7 @@ function reflowTimeline() {
 		end.style.width = Math.floor(div.getSize()[0] - (project.length - time) * 100) + "px"
 		end.style.height = "20px"
 
-		for (let i = 1; i < project.length; i++) {
-			let marker = document.createElement("div")
-			div.appendChild(marker)
-			var frac = (i - time)
-			marker.style.backgroundColor = "black"
-			marker.style.position = "absolute"
-			marker.style.height = "20px"
-			marker.style.width = "1px"
-			marker.style.left = Math.floor(frac * 100 - 1) + "px"
-		}
+
 
 		var name = document.createElement("div")
 		E.timelineNames.appendChild(name)
@@ -416,9 +398,9 @@ function reflowTimeline() {
 			})
 			name.appendChild(document.createTextNode(v.name + "/" + v.prop))
 
-			v.keys.forEach((v, ii) => {
+			v.keys.forEach((w, ii) => {
 				var button = document.createElement("button")
-				var frac = (v.time - time)
+				var frac = (w.time - time)
 
 				div.appendChild(button)
 				button.style.border = "none"
@@ -429,11 +411,12 @@ function reflowTimeline() {
 				button.style.left = Math.floor(frac * 100 - 5) + "px"
 				button.style.padding = "0"
 				button.addEventListener("click", () => {
-					B.formify(null, v, "Save", false, () => { reflowTimeline() }, true)
+					B.formify(null, w, "Save", false, () => { reflowTimeline() }, true)
 					var button = document.createElement("button")
 					button.appendChild(document.createTextNode("Delete"))
 					button.addEventListener("click", () => {
 						v.keys.splice(ii, 1)
+						B.modalWindow.delete()
 						reflowTimeline()
 					})
 					B.modalWindow.appendChild(button)
@@ -451,6 +434,24 @@ function reflowTimeline() {
 			})
 		}
 	})
+	var tSize = E.timeline.getSize()
+	var tPos = E.timeline.getPos()
+	for (let i = Math.floor(time) + 1; i < Math.ceil(time) + Math.floor(tSize[0] / 100) + 1; i++) {
+		let marker = document.createElement("div")
+		E.timeline.appendChild(marker)
+		var frac = (i - time)
+		marker.style.backgroundColor = "black"
+		marker.style.position = "fixed"
+		marker.style.height = tSize[1] + "px"
+		marker.style.width = "1px"
+		marker.style.left = Math.floor(frac * 100 - 1 + tPos[0]) + "px"
+		marker.style.top = tPos[1] + "px"
+		marker.style.zIndex = "2"
+	}
+
+	
+	E.timeline.parentElement.scrollTop = scroll
+	
 }
 
 function download() {
@@ -572,7 +573,7 @@ var recordMode = false
 var recorder = null
 var blobData = []
 function record() {
-	
+
 	capture = ctx.canvas.canvas.captureStream()
 	captureStart = Date.now()
 	recordMode = true
@@ -599,8 +600,8 @@ function record() {
 			URL.revokeObjectURL(url)
 		})
 		player.controls = true
-		player.setSize([500 * project.size[0] / project.size[1],500])
+		player.setSize([500 * project.size[0] / project.size[1], 500])
 		player.src = url
-				//B.saveFile(URL.createObjectURL(fullBlob), project.name + ".webm", "video/webm")
+		//B.saveFile(URL.createObjectURL(fullBlob), project.name + ".webm", "video/webm")
 	}
 }
