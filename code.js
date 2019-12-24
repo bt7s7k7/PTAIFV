@@ -144,7 +144,7 @@ function update(start = Date.now()) {
 		} else {
 			size = [fullSize[0], fullSize[1] / aspectRatio]
 		}
-		if (!recordMode) {
+		if (!recordMode || E.renderUseGradient.checked) {
 			var gradient = ctx.canvas.createLinearGradient(0, 0, size[0], 0)
 			gradient.addColorStop(0, colors.voidGrey.mul(0.5).toHex());
 			gradient.addColorStop(1, colors.notepad.toHex());
